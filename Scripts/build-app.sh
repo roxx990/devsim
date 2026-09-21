@@ -7,8 +7,9 @@
 #
 set -euo pipefail
 
-VERSION="2.0.0"          # keep in sync with AppInfo.fallbackVersion
-BUILD_NUMBER="1"
+# Overridable so the release workflow can stamp the bundle from the git tag.
+VERSION="${DEVSIM_VERSION:-2.0.0}"   # keep the default in sync with AppInfo.fallbackVersion
+BUILD_NUMBER="${DEVSIM_BUILD:-1}"
 BUNDLE_ID="dev.devsim.DevSim"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

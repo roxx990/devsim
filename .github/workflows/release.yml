@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and release, e.g. v2.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve version
+        id: version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build app bundle
+        env:
+          DEVSIM_VERSION: ${{ steps.version.outputs.version }}
+          DEVSIM_BUILD: ${{ github.run_number }}
+        run: Scripts/build-app.sh
+
+      - name: Verify bundle
+        run: |
+          plutil -lint build/DevSim.app/Contents/Info.plist
+          codesign --verify --verbose build/DevSim.app
+          STAMPED=$(plutil -extract CFBundleShortVersionString raw -o - build/DevSim.app/Contents/Info.plist)
+          test "$STAMPED" = "${{ steps.version.outputs.version }}"
+
+      - name: Package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/DevSim.app DevSim.zip
+          shasum -a 256 DevSim.zip | tee DevSim.zip.sha256
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Download `DevSim.zip`, unzip it, and move `DevSim.app` to `/Applications`.
+
+          ### First launch
+
+          The app is signed ad-hoc, not with a Developer ID, so macOS quarantines it
+          after download and refuses to open it. Clear the quarantine flag once:
+
+          ```bash
+          xattr -dr com.apple.quarantine /Applications/DevSim.app
+          ```
+
+          Then open it normally. Building from source avoids this entirely:
+
+          ```bash
+          Scripts/build-app.sh --install
+          ```
+
+          ### Requirements
+
+          macOS 13 Ventura or later. Xcode command line tools are needed for `simctl`,
+          which powers the screenshot, boot, uninstall and erase actions.
+          NOTES
+          printf '\n### Checksum\n\n```\n%s\n```\n' "$(cat DevSim.zip.sha256)" >> notes.md
+
+          gh release create "$TAG" \
+            DevSim.zip DevSim.zip.sha256 \
+            --title "DevSim ${{ steps.version.outputs.version }}" \
+            --notes-file notes.md

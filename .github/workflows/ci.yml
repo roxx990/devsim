@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and package
+    # Needs Swift 6.2 for the package manifest's defaultIsolation setting,
+    # which means Xcode 26 or newer.
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build (debug)
+        run: swift build
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Smoke test
+        # There are no simulators on a runner, so this prints the empty menu.
+        # It still exercises the scan, the menu construction and every model.
+        run: |
+          BIN="$(swift build -c release --show-bin-path)/DevSim"
+          "$BIN" --dump-menu
+
+      - name: Assemble app bundle
+        run: Scripts/build-app.sh
+
+      - name: Verify bundle
+        run: |
+          test -x build/DevSim.app/Contents/MacOS/DevSim
+          test -f build/DevSim.app/Contents/Resources/AppIcon.icns
+          plutil -lint build/DevSim.app/Contents/Info.plist
+          codesign --verify --verbose build/DevSim.app
+
+      - name: Zip bundle
+        # ditto rather than zip, so the bundle keeps its permissions and
+        # the code signature survives the round trip.
+        run: ditto -c -k --sequesterRsrc --keepParent build/DevSim.app DevSim.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DevSim-app
+          path: DevSim.zip
+          if-no-files-found: error

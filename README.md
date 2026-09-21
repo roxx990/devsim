@@ -1,5 +1,7 @@
 # DevSim
 
+[![CI](https://github.com/roxx990/devsim/actions/workflows/ci.yml/badge.svg)](https://github.com/roxx990/devsim/actions/workflows/ci.yml)
+
 A menu bar app for jumping straight into iOS/watchOS/tvOS simulator app folders.
 
 Click the menu bar icon, pick an app, land in its container.
@@ -15,9 +17,24 @@ Click the menu bar icon, pick an app, land in its container.
 ## Requirements
 
 - macOS 13 Ventura or later
-- Xcode command line tools (for the Swift toolchain and `simctl`)
+- Xcode command line tools, for `simctl` — it powers the screenshot, boot, uninstall and
+  erase actions
 
-## Build and install
+## Install
+
+Grab `DevSim.zip` from the [latest release](https://github.com/roxx990/devsim/releases/latest),
+unzip it, and move `DevSim.app` to `/Applications`.
+
+The release build is signed ad-hoc rather than with a Developer ID, so macOS quarantines it
+after download and refuses to open it. Clear the quarantine flag once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/DevSim.app
+```
+
+## Build from source
+
+Building it yourself avoids the quarantine step entirely:
 
 ```bash
 Scripts/build-app.sh --install
@@ -26,6 +43,9 @@ Scripts/build-app.sh --install
 That compiles a release build, assembles `DevSim.app`, renders the icon, ad-hoc signs the
 bundle, copies it to `/Applications` and launches it. Leave off `--install` to build into
 `./build` without touching `/Applications`.
+
+Building needs **Swift 6.2 or newer** (Xcode 26+), because the package manifest uses
+`defaultIsolation`. The app itself still runs on macOS 13.
 
 To work on it in Xcode, open `Package.swift`. Running the scheme launches the menu bar
 app directly — no bundle needed.
@@ -105,7 +125,23 @@ Sources/DevSim/
 Scripts/
   build-app.sh          builds and optionally installs DevSim.app
   make-icon.swift       renders AppIcon.icns
+.github/workflows/
+  ci.yml                builds, smoke tests and packages on every push
+  release.yml           publishes DevSim.zip when a v* tag is pushed
 ```
+
+## Releases
+
+Pushing a `v*` tag builds the app on a macOS runner and publishes `DevSim.zip` with its
+SHA-256 to a GitHub release:
+
+```bash
+git tag v2.0.1 && git push origin v2.0.1
+```
+
+The tag sets the bundle's `CFBundleShortVersionString`, and the workflow fails if the two
+disagree. `Scripts/build-app.sh` reads `DEVSIM_VERSION` and `DEVSIM_BUILD` for the same
+purpose locally.
 
 ## License
 
