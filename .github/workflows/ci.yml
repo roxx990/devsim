@@ -18,7 +18,7 @@ jobs:
     runs-on: macos-26
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Show toolchain
         run: |
@@ -53,7 +53,7 @@ jobs:
         # the code signature survives the round trip.
         run: ditto -c -k --sequesterRsrc --keepParent build/DevSim.app DevSim.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: DevSim-app
           path: DevSim.zip
