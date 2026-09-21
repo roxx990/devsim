@@ -53,8 +53,10 @@ jobs:
         # the code signature survives the round trip.
         run: ditto -c -k --sequesterRsrc --keepParent build/DevSim.app DevSim.zip
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: DevSim-app
           path: DevSim.zip
           if-no-files-found: error
+          # The payload is already a zip; re-compressing it just costs time.
+          compression-level: 0
